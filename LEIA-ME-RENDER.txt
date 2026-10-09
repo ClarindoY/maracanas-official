@@ -1,7 +1,7 @@
-MARACANÃS V24 — LEITURA DE PDF E OCR AUTOMÁTICO
+MARACANÃS V25 — LEITURA DE PDF E OCR AUTOMÁTICO
 
 ATUALIZAR O SERVIÇO EXISTENTE
-1. Extraia o ZIP. Envie o CONTEÚDO da pasta Central_V24_Render para a mesma raiz do projeto no GitHub, substituindo os arquivos correspondentes. package.json, package-lock.json, render.yaml, src, server e shared precisam ser atualizados juntos. Não basta trocar App.jsx.
+1. Extraia o ZIP. Envie o CONTEÚDO da pasta Central_V25_Render para a mesma raiz do projeto no GitHub, substituindo os arquivos correspondentes. package.json, package-lock.json, render.yaml, src, server e shared precisam ser atualizados juntos. Não basta trocar App.jsx.
 2. Use o mesmo repositório, serviço Render e disco persistente /var/data. Não crie outro Blueprint para esta atualização. Não envie node_modules, dist, data, bancos, .env ou chaves.
 3. Mantenha o build: npm ci --include=dev && npm run build
    Mantenha o start: npm start
@@ -24,6 +24,7 @@ O Render injeta RENDER_EXTERNAL_URL; para domínio próprio, configure APP_ORIGI
 Esta atualização não exige outra chave para OCR. O modelo português é instalado via npm e utilizado localmente no servidor, sem CDN durante a leitura. O resumo por IA continua exigindo OPENAI_API_KEY e saldo na API. A assinatura do ChatGPT não paga essa API.
 
 O QUE FOI CORRIGIDO
+- Resolvido o bloqueio de conjuntos acima de 240 mil caracteres: processamento automático em partes e consolidação com referências originais.
 - Página renderizada inteiramente branca não interrompe o resumo.
 - Páginas sem texto suficiente e páginas com pouco texto e imagens passam por OCR.
 - Leitura nativa, OCR, página branca e página pendente são identificados por documento e página.
@@ -35,11 +36,11 @@ O QUE FOI CORRIGIDO
 - Filtros continuam dentro de "Mostrar todos os filtros". São filtros do acervo carregado; campos sem dados disponíveis permanecem indisponíveis, sem dados inventados.
 
 LIMITES E REVISÃO
-Até 12 PDFs por análise, 20 MB e 150 páginas por PDF, 240 mil caracteres no conjunto.
+Até 12 PDFs por análise, 20 MB e 600 páginas por PDF. O conjunto é dividido automaticamente em partes de até 48 mil caracteres de texto, sem exigir separar PDFs. Há um limite de segurança de 5 milhões de caracteres no conjunto.
 Até 20 páginas processadas por OCR em uma análise. Limite por página: 90 segundos. Limites atingidos aparecem como pendências; selecione menos documentos e repita ou confira/preencha os campos manualmente.
-O sistema processa uma análise de cada vez no servidor. OCR e sete blocos de resumo podem levar vários minutos. Na análise automática PNCP, fechar a ficha não interrompe o trabalho.
+O sistema processa uma análise de cada vez no servidor. OCR e sete blocos de resumo por parte podem levar vários minutos; a ficha PNCP mostra parte, bloco e quantidade de etapas concluídas. Na análise automática PNCP, fechar a ficha não interrompe o trabalho.
 PDF criptografado, corrompido, imagem muito ruim, tabelas complexas e imagem misturada com texto abundante podem requerer revisão manual. Leitura concluída significa páginas processadas, não garantia de extração integral de cada elemento visual.
-Sete chamadas de IA extraem os blocos documentais; dados da empresa, cotações, disponibilidade e parecer estratégico dependem da equipe. Cada chamada recebe o texto selecionado. store:false é enviado; isso não promete retenção zero do provedor.
+São sete chamadas de IA por parte, com transmissão apenas daquela parte. Documentos maiores usam mais chamadas e têm custo proporcionalmente maior na API. O limite mensal conta análises, não chamadas individuais. Os achados são validados antes da consolidação; repetições exatas são removidas, valores diferentes são preservados e não se escolhe automaticamente qual retificação prevalece. Sete blocos extraem os dados documentais; dados da empresa, cotações, disponibilidade e parecer estratégico dependem da equipe. Cada chamada recebe apenas os trechos da parte em processamento. store:false é enviado; isso não promete retenção zero do provedor.
 Os campos precisam de trecho literal, documento e página. Números sem suporte são descartados. Essa validação não garante interpretação correta; confira o original.
 O PNCP fornece situação, dados e documentos publicados. Pendências na coleta são exibidas. Não se promete encontrar editais de todas as 17 fontes; as integrações e limitações existentes são preservadas.
 
@@ -51,6 +52,6 @@ Conflitos de edição retornam erro 409: recarregue a ficha antes de salvar nova
 Backups diários locais incluem banco e PDFs; os dez últimos são mantidos no mesmo disco. Uma cópia no mesmo disco não substitui backup externo.
 
 VALIDAÇÃO DESTA VERSÃO
-npm test: inclui leitura real de PDF com texto, página branca e OCR português offline, pendências, limite/timeout, resumo parcial com API simulada, permissões e preservação de resumo anterior.
+npm test: inclui leitura real de PDF com texto, página branca e OCR português offline, pendências, limite/timeout, resumo parcial com API simulada, permissões, divisão sem perda de texto, PDF real acima de 240 mil caracteres e preservação de resumo anterior após falha em uma parte posterior.
 npm run build: valida o frontend para produção.
 Não houve chamada real à OpenAI nem deploy na conta Render nesta validação. Depois de publicar, reprocessar um edital real confirma chave, saldo, conectividade e consumo de memória do seu serviço.

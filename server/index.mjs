@@ -50,7 +50,7 @@ export const server=createServer(async(req,res)=>{
  const m=u.pathname.match(/^\/api\/work\/tenders\/([^/]+)(?:\/(documents|comments|summary|official-analysis)(?:\/([^/]+))?)?$/);if(!m)return reply(404,{error:'Rota não encontrada.'});const id=decodeURIComponent(m[1]);
  if(!m[2]&&req.method==='GET')return reply(200,work.detail(session.user,id));
  if(!m[2]&&req.method==='PATCH')return reply(200,work.patch(session.user,id,await body(req)));
- if(m[2]==='official-analysis'&&req.method==='GET')return reply(200,officialQueue.status(id));
+ if(m[2]==='official-analysis'&&req.method==='GET'){const job=officialQueue.status(id);return reply(200,job?{...job,progress:work.get(id).analysisProgress||null}:null);}
  if(m[2]==='official-analysis'&&req.method==='POST')return reply(202,officialQueue.start(session.user,id));
  if(m[2]==='comments'&&req.method==='POST'){const b=await body(req);work.comment(session.user,id,b.text);return reply(200,work.detail(session.user,id));}
  if(m[2]==='documents'&&!m[3]&&req.method==='POST'){if(!allowed(session.user,'Acessar documentos'))return reply(403,{error:'Sem permissão para documentos.'});let size=0;const chunks=[];for await(const c of req){size+=c.length;if(size>20*1024*1024)fail(413,'Limite: 20 MB por PDF.');chunks.push(c);}let name;try{name=decodeURIComponent(req.headers['x-file-name']||'');}catch{fail(400,'Nome inválido.');}return reply(201,work.upload(session.user,id,name,Buffer.concat(chunks)));}

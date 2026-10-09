@@ -27,7 +27,7 @@ async function deadline(promise,ms){let timer;try{return await Promise.race([pro
 export async function readPDFs(dir,documents,{ocrFactory=createPortugueseOCR,maxOCRPages=20,ocrTimeout=90000}={}){
  const pages=[],coverage=[];let total=0,ocrCount=0,ocr,ocrUnavailable=false;
  try{for(const d of documents){const loading=getDocument({data:new Uint8Array(readFileSync(resolve(dir,d.id+'.pdf'))),isEvalSupported:false,useSystemFonts:true,CanvasFactory,standardFontDataUrl:pdfRoot+'/standard_fonts/',cMapUrl:pdfRoot+'/cmaps/',cMapPacked:true});
- try{const pdf=await loading.promise;if(pdf.numPages>150)fail(413,'Limite: 150 páginas por PDF.');
+ try{const pdf=await loading.promise;if(pdf.numPages>600)fail(413,'Limite: 600 páginas por PDF.');
  for(let n=1;n<=pdf.numPages;n++){let page;const record={documentId:d.id,name:d.name,page:n,status:'pending',reason:''};coverage.push(record);
  try{page=await pdf.getPage(n);const content=await page.getTextContent();let text=content.items.map(i=>i.str||'').join(' ').trim();let method='native';
  const operators=text.length<250?await page.getOperatorList():null;
@@ -42,7 +42,7 @@ export async function readPDFs(dir,documents,{ocrFactory=createPortugueseOCR,max
  if(record.confidence<60||candidate.length<12||!/[A-Za-zÀ-ÿ]{3}/.test(candidate)){record.reason='OCR sem texto confiável. Confira esta página no original.';continue;}
  text=text?text+'\n'+candidate:candidate;method='ocr';
  }finally{canvas.width=1;canvas.height=1;}}
- total+=text.length;if(total>240000)fail(413,'Conjunto muito extenso para uma análise. Separe os documentos.');record.status=method;record.reason=method==='ocr'?'Texto reconhecido por OCR: conferir números, tabelas e interpretação no original.':'';pages.push({documentId:d.id,name:d.name,page:n,text,method});
+ total+=text.length;if(total>5000000)fail(413,'Limite de segurança: 5 milhões de caracteres extraídos no conjunto. O resumo anterior foi preservado.');record.status=method;record.reason=method==='ocr'?'Texto reconhecido por OCR: conferir números, tabelas e interpretação no original.':'';pages.push({documentId:d.id,name:d.name,page:n,text,method});
  }catch(e){if(e.status)throw e;record.reason='Não foi possível ler ou renderizar esta página. Confira o original.';}finally{page?.cleanup();}}
  }finally{await loading.destroy();}}
  }finally{if(ocr)await ocr.close();}
