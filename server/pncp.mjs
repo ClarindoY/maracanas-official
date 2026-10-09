@@ -1,3 +1,4 @@
+import {pncpRequest} from './pncp-network.mjs';
 export function remoteURL(input) {
   const u = new URL(input, 'http://localhost');
   const path = u.pathname.replace(/^\/api\/pncp-proxy/, '');
@@ -20,12 +21,12 @@ export function remoteURL(input) {
   throw new Error('Rota não permitida.');
 }
 export async function fetchPNCP(url) {
-  const r = await fetch(url, {signal:AbortSignal.timeout(25000),headers:{Accept:'application/json'}});
-  if (!r.ok) throw new Error(`PNCP respondeu HTTP ${r.status}.`);
+  return pncpRequest(url,async r=>{
   if (r.status === 204 && url.pathname.endsWith('/itens')) return [];
   const chunks=[]; let bytes=0;
   for await(const chunk of r.body) {bytes += chunk.length; if(bytes > 5*1024*1024) throw new Error('Resposta excede 5 MB.'); chunks.push(chunk);}
   const text=Buffer.concat(chunks).toString();
   if(!text.trim()) throw new Error('PNCP retornou resposta vazia.');
   try { return JSON.parse(text); } catch { throw new Error('Resposta PNCP não é JSON válido.'); }
+  });
 }
