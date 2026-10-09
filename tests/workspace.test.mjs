@@ -45,3 +45,13 @@ test('análise de PDF com API simulada salva todos os blocos e preserva resumo a
  await assert.rejects(()=>summarize(w,u,t.id,[d.id],async()=>({ok:false,status:503})),e=>e.status===502);assert.equal(w.get(t.id).summary.generatedAt,original);
  }finally{if(key===undefined)delete process.env.OPENAI_API_KEY;else process.env.OPENAI_API_KEY=key;auth.db.close();rmSync(dir,{recursive:true,force:true});}
 });
+
+test('resumo parcial salva cobertura em nuvem, mantém ausência inconclusiva e bloqueia recomendação',async()=>{
+ const dir=mkdtempSync(join(tmpdir(),'partial-'));const auth=openAuth(join(dir,'auth.sqlite'));auth.db.prepare('INSERT INTO users(id,name,login,email,password,permissions) VALUES(?,?,?,?,?,?)').run('a','Alice','alice','a@test.test','unused',JSON.stringify(permissions));const u={id:'a',nome:'Alice',permissoes:permissions},w=openWorkspace(auth,join(dir,'docs')),key=process.env.OPENAI_API_KEY;process.env.OPENAI_API_KEY='mock-only';
+ try{const t=w.create(u,{titulo:'Teste parcial'}),d=w.upload(u,t.id,'edital.pdf',readFileSync(new URL('./fixtures/native-blank-scan.pdf',import.meta.url)));
+ const mock=async(url,request)=>{const body=JSON.parse(request.body),input=JSON.parse(body.input);assert.equal(input.readingCoverage.pendingPages,1);return {ok:true,json:async()=>({status:'completed',output:[{content:[{type:'output_text',text:JSON.stringify({fields:input.categories.map(f=>({label:f.id,value:f.id==='b1_2'?input.documents[0].text:null,evidence:f.id==='b1_2'?[{documentId:d.id,page:1,quote:input.documents[0].text}]:[]}))})}]}]})};};
+ const out=await summarize(w,u,t.id,[d.id],mock,{maxOCRPages:0});assert.equal(out.summary.partial,true);assert.equal(w.get(t.id).readingReport.pendingPages,1);assert.ok(out.summary.fields.find(f=>f.label==='b1_2').value);assert.match(out.summary.fields.find(f=>f.label==='b1_5').note,/páginas pendentes/);
+ const review={technical:'Viável',documentary:'Viável',operational:'Viável',financial:'Viável',conclusion:'Recomendada',reason:'Revisão da equipe'};assert.throws(()=>w.patch(u,t.id,{version:out.version,changes:{analysis:{pricing:[],tasks:[],review}}}),e=>e.status===400&&/leitura pendente/.test(e.message));
+ const unreadable=w.upload(u,t.id,'figura.pdf',readFileSync(new URL('./fixtures/unreadable.pdf',import.meta.url)));await assert.rejects(()=>summarize(w,u,t.id,[unreadable.id],mock,{maxOCRPages:0}),e=>e.status===422);assert.equal(w.get(t.id).summary.generatedAt,out.summary.generatedAt);assert.equal(w.get(t.id).readingReport.pages[0].documentId,unreadable.id);
+ }finally{if(key===undefined)delete process.env.OPENAI_API_KEY;else process.env.OPENAI_API_KEY=key;auth.db.close();rmSync(dir,{recursive:true,force:true});}
+});

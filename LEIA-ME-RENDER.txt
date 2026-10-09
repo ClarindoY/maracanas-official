@@ -1,12 +1,16 @@
-MARACANÃS V20 - SERVIDOR COMPARTILHADO
+MARACANÃS V24 — LEITURA DE PDF E OCR AUTOMÁTICO
 
-ESTA ATUALIZAÇÃO EXIGE O PROJETO COMPLETO. Não substitua somente App.jsx.
-Extraia o ZIP e envie o CONTEÚDO de Central_V20_Render à mesma raiz do projeto no GitHub, substituindo os arquivos. Não envie node_modules, dist, data, bancos de dados, .env ou chaves.
+ATUALIZAR O SERVIÇO EXISTENTE
+1. Extraia o ZIP. Envie o CONTEÚDO da pasta Central_V24_Render para a mesma raiz do projeto no GitHub, substituindo os arquivos correspondentes. package.json, package-lock.json, render.yaml, src, server e shared precisam ser atualizados juntos. Não basta trocar App.jsx.
+2. Use o mesmo repositório, serviço Render e disco persistente /var/data. Não crie outro Blueprint para esta atualização. Não envie node_modules, dist, data, bancos, .env ou chaves.
+3. Mantenha o build: npm ci --include=dev && npm run build
+   Mantenha o start: npm start
+   Root Directory: pasta que contém package.json.
+4. Após o commit, aguarde o deploy automático, caso esteja habilitado; caso contrário, faça deploy do commit mais recente no serviço existente.
+5. Entre com a mesma conta. Abra a licitação que apresentou erro e clique em "Atualizar documentos e gerar análise oficial". O erro anterior não é reprocessado sozinho.
+6. Confira o relatório "Conferir páginas e métodos de leitura" e os oito blocos do resumo.
 
-ANTES DO DEPLOY NO SERVIÇO EXISTENTE:
-1. Altere Instance Type para Starter ou superior. Revise os valores na conta.
-2. Adicione um disco persistente em /var/data. O Blueprint incluído usa 1 GB.
-3. Environment:
+VARIÁVEIS DO SERVIDOR
 NODE_VERSION = 22.16.0
 NODE_ENV = production
 DEMO_MODE = false
@@ -15,68 +19,38 @@ BACKUP_ENABLED = true
 MAX_DOCUMENT_BYTES = 67108864
 AI_MONTHLY_LIMIT = 100
 OPENAI_MODEL = gpt-4o-mini
-4. Remova DEMO_LOGIN e DEMO_PASSWORD. Não há senha padrão nesta versão.
-5. Para análise de PDFs: adicione OPENAI_API_KEY no painel Environment. A API tem cobrança própria. Nunca coloque a chave no GitHub ou no App.jsx. Sem chave, site e uploads funcionam, mas o resumo apresenta aviso de configuração.
-6. Build: npm ci --include=dev && npm run build
-Start: npm start
-Health Check Path: /api/health
-Root Directory: onde está package.json.
-7. Faça deploy após atualizar todos os arquivos. Render injeta RENDER_EXTERNAL_URL. Para domínio próprio, adicione APP_ORIGIN com a origem HTTPS.
-8. Após o serviço iniciar, abra Shell do serviço e execute: npm run criar-admin
-Preencha nome, login, e-mail e senha de no mínimo 12 caracteres. Não compartilhe a senha no chat. Esse comando usa ER_AUTH_DB e cria a conta no disco persistente. Contas do modo gratuito não são migradas automaticamente.
-9. Faça login, crie funcionários em Administração e atribua permissões. Usuários novos começam sem permissões. Alterar permissões encerra sessões do funcionário; ele deve entrar novamente.
+OPENAI_API_KEY = sua chave privada, exclusivamente no painel Environment
+O Render injeta RENDER_EXTERNAL_URL; para domínio próprio, configure APP_ORIGIN com a origem HTTPS.
+Esta atualização não exige outra chave para OCR. O modelo português é instalado via npm e utilizado localmente no servidor, sem CDN durante a leitura. O resumo por IA continua exigindo OPENAI_API_KEY e saldo na API. A assinatura do ChatGPT não paga essa API.
 
-NOVO FLUXO
-Importar edital > título e origem informados pela equipe > criar ficha > enviar edital e anexos em PDF > selecionar até 4 documentos > gerar resumo.
-Cada PDF: até 20 MB / 150 páginas. Conjunto: até 240 mil caracteres de texto extraído. PDF escaneado, criptografado ou com páginas ilegíveis precisa de tratamento/OCR externo nesta versão. Não há resumo parcial silencioso.
-A IA recebe texto dos documentos selecionados. Uso da função envia esse conteúdo à OpenAI. store:false é enviado; isso não é promessa de retenção zero da plataforma.
-Cada seção só permanece quando possui trecho localizado no texto e página corretos. Números apresentados precisam estar presentes nos trechos citados. Isso reduz respostas sem suporte, mas NÃO garante a interpretação da IA. Resumo é proposta para revisão, separado dos campos manuais. Nenhum campo operacional é preenchido automaticamente pelo resumo. Datas inválidas não são corrigidas por suposição.
-Campos manuais são opcionais: ausência permanece em branco. Cada salvamento guarda autor, antes e depois.
-Colaboradores podem editar a mesma ficha. Revisões concorrentes recebem erro 409, pedindo recarregar a ficha; não há sobrescrita automática. Atualizar acervo e Recarregar ficha trazem trabalho de outros colaboradores. Não é sincronização em tempo real.
-A ficha mostra criador e horário de inclusão no servidor. Consultar a ficha registra abertura, mas não muda o criador. Uma oportunidade encontrada já existente mantém o criador original.
-Não há migração automática do IndexedDB da V18: os dados antigos continuam no navegador. Importe PDFs importantes novamente. Não limpar o armazenamento antigo antes de conferir a migração manual.
-Propostas: seleção de documentos por licitação é compartilhada; não envia nada aos portais. Envio oficial e assinatura continuam externos.
+O QUE FOI CORRIGIDO
+- Página renderizada inteiramente branca não interrompe o resumo.
+- Páginas sem texto suficiente e páginas com pouco texto e imagens passam por OCR.
+- Leitura nativa, OCR, página branca e página pendente são identificados por documento e página.
+- Páginas ilegíveis continuam pendentes. Havendo outras páginas legíveis, gera-se um resumo explicitamente parcial; não se conclui que uma exigência está ausente no edital completo.
+- Se nenhuma página puder ser lida, não há resumo novo; relatório da tentativa é salvo e o resumo anterior é preservado e identificado.
+- OCR de baixa confiança não vira informação preenchida. Texto reconhecido ainda exige conferência, especialmente números e tabelas; confiança OCR não comprova exatidão.
+- A recomendação "Recomendada" fica bloqueada enquanto houver páginas pendentes. Parecer condicionado continua disponível.
+- Falhas nos detalhes da busca aparecem com motivo e botão para repetir somente os resultados com falha.
+- Filtros continuam dentro de "Mostrar todos os filtros". São filtros do acervo carregado; campos sem dados disponíveis permanecem indisponíveis, sem dados inventados.
 
-AUDITORIA
-Aba Auditoria da administradora: login, logout, buscas PNCP/fontes, criação e abertura de fichas, alterações com antes/depois, responsáveis, colaboradores, documentos anexados/baixados, comentários, análise IA e permissões.
-É auditoria de ações do sistema, não vigilância de outras abas ou prova de horas trabalhadas. Não captura senhas. Sem rota para editar/excluir o histórico; administrador com acesso ao banco/infraestrutura ainda pode modificá-lo. Não é trilha criptográfica inviolável.
+LIMITES E REVISÃO
+Até 12 PDFs por análise, 20 MB e 150 páginas por PDF, 240 mil caracteres no conjunto.
+Até 20 páginas processadas por OCR em uma análise. Limite por página: 90 segundos. Limites atingidos aparecem como pendências; selecione menos documentos e repita ou confira/preencha os campos manualmente.
+O sistema processa uma análise de cada vez no servidor. OCR e sete blocos de resumo podem levar vários minutos. Na análise automática PNCP, fechar a ficha não interrompe o trabalho.
+PDF criptografado, corrompido, imagem muito ruim, tabelas complexas e imagem misturada com texto abundante podem requerer revisão manual. Leitura concluída significa páginas processadas, não garantia de extração integral de cada elemento visual.
+Sete chamadas de IA extraem os blocos documentais; dados da empresa, cotações, disponibilidade e parecer estratégico dependem da equipe. Cada chamada recebe o texto selecionado. store:false é enviado; isso não promete retenção zero do provedor.
+Os campos precisam de trecho literal, documento e página. Números sem suporte são descartados. Essa validação não garante interpretação correta; confira o original.
+O PNCP fornece situação, dados e documentos publicados. Pendências na coleta são exibidas. Não se promete encontrar editais de todas as 17 fontes; as integrações e limitações existentes são preservadas.
 
-BACKUP
-Na inicialização e checagem a cada hora, gera uma cópia por dia UTC, se ainda não existir uma concluída. Inclui banco (contas, licitações, comentários, auditoria) e documentos. Retém as 10 cópias concluídas mais recentes; elimina antigas somente após finalizar nova cópia. Diretório /var/data/backups. Dados e cópias ficam NO MESMO DISCO: não protege contra perda do próprio disco/conta. Cópia externa e tela de restauração não estão implementadas.
-Com disco de 1 GB, o limite de PDFs foi definido em 64 MiB para reservar espaço para as 10 cópias. Aumentar documentos exige dimensionar disco para dados + até 10 backups + banco. Não aumentar MAX_DOCUMENT_BYTES sem revisar espaço.
-Restaurar (operador técnico): parar serviço, copiar auth.sqlite e documents de uma cópia concluída ao diretório /var/data preservando os dados atuais em outra cópia; reiniciar e validar. Não sobrescrever banco com servidor ativo.
+DADOS E CONTAS
+Contas, licitações, PDFs, complementos, comentários, relatórios de leitura e auditoria ficam no servidor, no disco persistente. Não se usa localStorage, sessionStorage ou IndexedDB. A sessão usa cookie HttpOnly.
+Preservar /var/data/auth.sqlite e o mesmo disco mantém as contas e os registros já existentes. Não execute criar-admin para recriar uma conta que já funciona.
+Para uma instalação nova, execute npm run criar-admin no Shell do serviço. Não há senha padrão. Senha mínima: 12 caracteres. Funcionários são criados em Administração, com permissões explícitas.
+Conflitos de edição retornam erro 409: recarregue a ficha antes de salvar novamente. A auditoria registra o autor das ações no sistema e alterações com antes/depois, não atividades fora do site.
+Backups diários locais incluem banco e PDFs; os dez últimos são mantidos no mesmo disco. Uma cópia no mesmo disco não substitui backup externo.
 
-LIMITES E PENDÊNCIAS
-PNCP + cinco fontes complementares preservadas. O próximo deploy registra causa de falha de rede do PNCP e prefere IPv4; NÃO foi validado acesso a partir da sua instância Render. Conectores complementares continuam parciais.
-Filtros desta entrega: UF, fonte, modalidade e etapa, sobre o acervo salvo. Busca remota PNCP continua palavra-chave + propostas abertas. Equivalência com todos os filtros PNCP ainda pendente.
-Lista carrega no máximo 2.000 licitações por serviço.
-Recuperação por e-mail, suporte compartilhado, OCR automático, agente conversacional e emissão/envio final de propostas não estão implementados.
-IA tem limite mensal de 100 análises iniciadas (inclusive falhas após o início). É limite de quantidade, não de reais. Controle de cobrança adicional deve ser configurado na conta da API.
-Validação local: build e testes; leitura dos dois PDFs Sebrae validada sem consumo da API. Uma análise REAL depende da sua chave e deve ser conferida antes de uso operacional.
-
-V20 — RESUMO EM OITO BLOCOS
-Todos os subcampos solicitados aparecem explicitamente. Só PDFs selecionados são analisados; anexos não selecionados e atualizações do portal não são consultados. A equipe deve conferir completude do conjunto. Situação atual, fornecedores e disponibilidade dependem de confirmação externa.
-A análise utiliza até sete chamadas de IA (os blocos com dados extraíveis), transmitindo o conjunto selecionado em cada chamada; o custo será maior que na V22. O limite mensal conta análises iniciadas, não chamadas individuais. Pode demorar vários minutos; evite sair da ficha durante o processamento. Falha em qualquer bloco preserva o resumo anterior sem salvar resultado parcial.
-Custos e margens não são inventados: a equipe informa quantidade, preço, custo unitário, tributos e indiretos por item. O desconto simulado incide apenas nas linhas marcadas disputáveis. Resultado = receita - custo - tributos; ponto de equilíbrio = custo / (1 - alíquota), por linha. Esse modelo não cobre regimes tributários complexos ou despesas omitidas. Simulação de desconto é temporária; as premissas são salvas.
-Pendências têm responsável, data e status. Parecer é revisado pela equipe: recomendação positiva exige quatro viabilidades confirmadas, justificativa e pendências concluídas. Não certifica habilitação ou exequibilidade e não altera a decisão automaticamente. Referências literais são verificadas, mas não garantem interpretação correta; confira o original. Sem chave API não há análise real.
-Dados e complementos V22 são preservados no mesmo banco; gere novamente o resumo para o formato V20. Não mude a localização do banco para atualizar.
-
-V21 — SEM PERSISTÊNCIA DE DADOS NO NAVEGADOR
-Removidos os módulos antigos de localStorage e IndexedDB, inclusive o código não utilizado. O sistema não usa localStorage, sessionStorage ou IndexedDB. Dados de negócio e contas ficam no disco persistente /var/data do servidor. Há estado temporário em memória enquanto a tela está aberta e cookie HttpOnly de sessão para autenticação; isso não é armazenamento de licitações no navegador. Sem disco persistente corretamente configurado, não há garantia de retenção após deploy. Dados antigos do navegador não são migrados nem apagados automaticamente.
-
-V22 — COLETA E ANÁLISE AUTOMÁTICA PNCP
-Ao abrir pela primeira vez uma ficha PNCP sem resumo e sem processamento prévio, o servidor solicita automaticamente os documentos e a análise. Não dispara cobrança de IA para todos os resultados de uma busca: a leitura começa na primeira abertura da ficha por usuário com permissões de análise e documentos. O botão Atualizar documentos e gerar análise oficial permite nova consulta, inclusive depois de erro ou retificação.
-A fila salva o status no banco; fechamento da tela não cancela o processamento. Um reinício do serviço marca trabalho pendente como interrompido e permite solicitar novamente. Processa uma licitação por vez, com fila de até 20. Não há agendamento periódico de atualização de editais.
-O servidor atualiza o detalhe oficial, consulta até 1.000 itens e lista até 100 arquivos. Downloads usam exclusivamente rotas fixas do PNCP, sem seguir destinos arbitrários ou redirecionamentos. PDFs até 20 MB por arquivo são guardados no disco, sem duplicar hashes iguais. Arquivos não PDF e falhas ficam no manifesto e nas pendências. Pode faltar documento: a equipe deve conferir os avisos e a completude da análise. ZIPs, planilhas, DOCX e OCR ainda não são lidos automaticamente.
-A análise automática reúne até 12 PDFs oficiais, sujeita ao limite de 240.000 caracteres e 150 páginas por arquivo. Exceder bloqueia a leitura automática com aviso em vez de omitir silenciosamente documentos. A chave OPENAI_API_KEY continua necessária; sem ela a coleta salva PDFs e dados oficiais e informa que a análise está pendente.
-Portal e documento alimentam os mesmos campos por categoria, com origem e horário da consulta. Comparação de textos/representações de valor e datas sinaliza conferência e possíveis divergências; não é validação semântica definitiva. Nunca sobrescreve complementos da equipe. Itens e prazo do portal não se confundem com condições detalhadas do edital. Dados oficiais permanecem disponíveis mesmo quando o PDF não informa o campo.
-Coleta automática implementada nesta versão SOMENTE para PNCP. Demais conectores continuam parciais, sem download/análise automática; PDFs particulares seguem por importação manual.
-Validação: consulta real PNCP encontrou 6 documentos numa licitação e download de PDF de aproximadamente 2 MB foi confirmado. Testes automatizados de coleta usam serviço simulado. Chamada real à OpenAI e deploy no Render ainda precisam de validação com a chave e o ambiente do usuário.
-Atualize o MESMO repositório, Blueprint, serviço e disco /var/data para preservar contas e acervo. Não precisa criar outro administrador.
-
-V23 — FILTROS, REDE E ESTADOS DA ANÁLISE
-Restaurados os campos da referência PNCP dentro de Mostrar todos os filtros, com Busca avançada. Filtros aplicam-se ao acervo do servidor, não à totalidade do PNCP: a consulta remota continua por palavra-chave e propostas abertas. Opções são derivadas de registros reais. Campos sem dados ficam desabilitados e explicitamente indisponíveis. Fornecedores/Arrematantes, Nota Fiscal Eletrônica e Critério de Julgamento ainda não têm coleta de dados próprios nesta versão. Emendas só mostram presença publicada, não ausência inferida.
-Estados do filtro: propostas abertas pela situação divulgada e prazo futuro; julgamento inferido pelo prazo passado (não confirma julgamento oficial); encerradas pela situação revogada/anulada; todos inclui dados sem classificação. Confira a situação vigente no portal. Registros particulares sem situação oficial são visíveis em Todos.
-Dados oficiais já salvos alimentam os campos de Informações gerais antes de haver resumo de PDF. Valores ausentes em PDF não apagam os dados do portal. Não analisado, em andamento, falha e não localizado no PDF são mensagens diferentes.
-Consultas GET ao PNCP, inclusive downloads, usam até três tentativas em ECONNRESET, timeout, falhas temporárias de DNS/conexão e HTTP 429/5xx. Chamadas são serializadas com intervalo mínimo de 300 ms e espera crescente. HTTP 4xx permanentes não são repetidos. Logs mostram rota, tentativa, código e HTTP. Isso reduz falhas temporárias mas não corrige bloqueio persistente do PNCP ou de rede do Render. Não altera ou inventa os dados previamente salvos.
-Esta atualização não remove a necessidade de configurar OPENAI_API_KEY. Chamada real à IA e acesso PNCP a partir do Render ainda precisam de validação no ambiente publicado.
+VALIDAÇÃO DESTA VERSÃO
+npm test: inclui leitura real de PDF com texto, página branca e OCR português offline, pendências, limite/timeout, resumo parcial com API simulada, permissões e preservação de resumo anterior.
+npm run build: valida o frontend para produção.
+Não houve chamada real à OpenAI nem deploy na conta Render nesta validação. Depois de publicar, reprocessar um edital real confirma chave, saldo, conectividade e consumo de memória do seu serviço.
