@@ -16,7 +16,7 @@ export function validateSummary(out,pages){
 export async function summarize(work,user,id,documentIds,fetcher=fetch){
  if(!allowed(user,'Analisar editais')||!allowed(user,'Acessar documentos'))fail(403,'Sem permissão para resumir documentos.');
  if(!process.env.OPENAI_API_KEY)fail(503,'Configure OPENAI_API_KEY no Render para habilitar o resumo.');
- const docs=work.docs(id);if(!Array.isArray(documentIds)||!documentIds.length||documentIds.length>4||new Set(documentIds).size!==documentIds.length)fail(400,'Selecione de 1 a 4 PDFs desta licitação.');
+ const docs=work.docs(id);if(!Array.isArray(documentIds)||!documentIds.length||documentIds.length>12||new Set(documentIds).size!==documentIds.length)fail(400,'Selecione de 1 a 12 PDFs desta licitação.');
  const selected=documentIds.map(did=>{const d=docs.find(x=>x.id===did);if(!d)fail(400,'Documento não pertence a esta licitação.');return d;});
  const pages=[];let total=0;
  for(const d of selected){const loading=getDocument({data:new Uint8Array(readFileSync(resolve(work.dir,d.id+'.pdf'))),isEvalSupported:false,useSystemFonts:true});let pdf;try{pdf=await loading.promise;if(pdf.numPages>150)fail(413,'Limite: 150 páginas por PDF.');for(let n=1;n<=pdf.numPages;n++){const page=await pdf.getPage(n);const content=await page.getTextContent();const text=content.items.map(i=>i.str||'').join(' ');total+=text.length;if(total>240000)fail(413,'Conjunto muito extenso para uma análise. Separe os documentos.');if(text.trim().length<25)fail(422,'Há página sem texto legível em '+d.name+' (página '+n+'). Faça OCR antes de analisar; o sistema não vai omitir essa página.');pages.push({documentId:d.id,name:d.name,page:n,text});}}finally{await loading.destroy();}}

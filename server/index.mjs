@@ -1,6 +1,7 @@
 import {setDefaultResultOrder} from 'node:dns';
 setDefaultResultOrder('ipv4first');
 import {openWorkspace,allowed,fail} from './workspace.mjs';
+import {createOfficialQueue} from './official-analysis.mjs';
 import {summarize} from './summary.mjs';
 import {makeBackup} from './backups.mjs';
 import {initializeDemo} from './demo.mjs';
@@ -11,6 +12,7 @@ import {remoteURL,fetchPNCP} from './pncp.mjs';
 import {openAuth,verifyPassword,hashPassword,token,permissions} from './auth.mjs';
 const hosting=hostingConfig();const auth=openAuth();await initializeDemo(auth);const dummy=await hashPassword(token());let active=0,authActive=0;
 const work=openWorkspace(auth);let summaryActive=false;
+const officialQueue=createOfficialQueue(work,async(user,id,docs)=>{if(summaryActive)throw Error('Outra análise está em andamento. Solicite novamente.');summaryActive=true;try{return await summarize(work,user,id,docs);}finally{summaryActive=false;}});
 if(process.env.BACKUP_ENABLED==='true'){try{makeBackup(auth,work.dir);}catch(e){console.error('Backup falhou: '+e.message);}setInterval(()=>{try{makeBackup(auth,work.dir);}catch(e){console.error('Backup falhou: '+e.message);}},3600000).unref();}
 const origins=hosting.origins;
 async function body(req){let data='';for await(const chunk of req){data+=chunk;if(Buffer.byteLength(data)>(req.url?.startsWith('/api/work/')?262144:16384))throw new Error('Corpo excede limite.');}return JSON.parse(data||'{}');}
@@ -45,9 +47,11 @@ export const server=createServer(async(req,res)=>{
  if(u.pathname==='/api/work/tenders'&&req.method==='GET')return reply(200,work.list());
  if(u.pathname==='/api/work/tenders'&&req.method==='POST')return reply(201,work.create(session.user,await body(req)));
  if(u.pathname==='/api/work/audit'&&req.method==='GET'){if(!session.user.admin)return reply(403,{error:'Auditoria exclusiva da administração.'});const actor=u.searchParams.get('actor')||'';const page=Math.max(1,Math.min(10000,Number(u.searchParams.get('page'))||1));return reply(200,work.db.prepare('SELECT * FROM activity WHERE (?=\'\' OR actor=?) ORDER BY id DESC LIMIT 100 OFFSET ?').all(actor,actor,(page-1)*100));}
- const m=u.pathname.match(/^\/api\/work\/tenders\/([^/]+)(?:\/(documents|comments|summary)(?:\/([^/]+))?)?$/);if(!m)return reply(404,{error:'Rota não encontrada.'});const id=decodeURIComponent(m[1]);
+ const m=u.pathname.match(/^\/api\/work\/tenders\/([^/]+)(?:\/(documents|comments|summary|official-analysis)(?:\/([^/]+))?)?$/);if(!m)return reply(404,{error:'Rota não encontrada.'});const id=decodeURIComponent(m[1]);
  if(!m[2]&&req.method==='GET')return reply(200,work.detail(session.user,id));
  if(!m[2]&&req.method==='PATCH')return reply(200,work.patch(session.user,id,await body(req)));
+ if(m[2]==='official-analysis'&&req.method==='GET')return reply(200,officialQueue.status(id));
+ if(m[2]==='official-analysis'&&req.method==='POST')return reply(202,officialQueue.start(session.user,id));
  if(m[2]==='comments'&&req.method==='POST'){const b=await body(req);work.comment(session.user,id,b.text);return reply(200,work.detail(session.user,id));}
  if(m[2]==='documents'&&!m[3]&&req.method==='POST'){if(!allowed(session.user,'Acessar documentos'))return reply(403,{error:'Sem permissão para documentos.'});let size=0;const chunks=[];for await(const c of req){size+=c.length;if(size>20*1024*1024)fail(413,'Limite: 20 MB por PDF.');chunks.push(c);}let name;try{name=decodeURIComponent(req.headers['x-file-name']||'');}catch{fail(400,'Nome inválido.');}return reply(201,work.upload(session.user,id,name,Buffer.concat(chunks)));}
  if(m[2]==='documents'&&m[3]&&req.method==='GET'){const d=work.document(session.user,id,m[3]);res.writeHead(200,{'Content-Type':'application/pdf','Content-Disposition':"attachment; filename*=UTF-8''"+encodeURIComponent(d.metadata.name),'Content-Length':d.bytes.length,'Cache-Control':'no-store'});return res.end(d.bytes);}

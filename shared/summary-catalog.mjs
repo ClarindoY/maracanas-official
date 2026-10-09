@@ -28,3 +28,11 @@ export function pricingScenario(rows,discount){
  }
  return {revenue,cost,tax,profit:revenue-cost-tax,margin:revenue?(revenue-cost-tax)/revenue*100:null,items,breakEven:items.reduce((s,i)=>s+i.breakEven,0)};
 }
+export function compareSources(field,portal,document){
+ if(!portal||!document)return {status:'Sem comparação',message:'Uma das fontes não informa este campo.'};
+ const normalize=v=>v.normalize('NFKC').replace(/\s+/g,' ').trim().toLowerCase();
+ if(normalize(portal)===normalize(document))return {status:'Texto coincidente',message:'Os textos coincidem; confirme contexto e vigência.'};
+ if(field==='b1_5'){const values=String(portal).match(/R\$\s*[\d.]+,\d{2}/g)||[];if(values.length&&!values.every(v=>normalize(document).includes(normalize(v))))return {status:'Possível divergência',message:'O valor global do portal não aparece com a mesma representação no resumo. Confira orçamento, lotes, sigilo e retificações.'};}
+ if(field==='b1_4'){const dates=[...portal.matchAll(/(\d{4})-(\d{2})-(\d{2})/g)].map(m=>m[3]+'/'+m[2]+'/'+m[1]);if(dates.length&&!dates.every(d=>document.includes(d)))return {status:'Conferir prazos',message:'As datas do portal não aparecem todas no resumo no formato dia/mês/ano. Pode ser diferença de formato ou de prazo; confirme na fonte.'};}
+ return {status:'Conferência necessária',message:'Informações das duas fontes reunidas neste campo. Confira diferenças de redação, contexto e atualizações.'};
+}
