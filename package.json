@@ -1,0 +1,27 @@
+{
+  "name": "maracanas-central-v20",
+  "version": "0.20.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "scripts": {
+    "dev": "node server/dev.mjs",
+    "build": "vite build",
+    "test": "node --test tests/*.test.mjs",
+    "criar-admin": "node server/create-admin.mjs",
+    "start": "node server/index.mjs"
+  },
+  "dependencies": {
+    "adm-zip": "0.6.1",
+    "cheerio": "1.1.2",
+    "csv-parse": "7.0.3",
+    "pdfjs-dist": "5.4.149",
+    "react": "19.2.0",
+    "react-dom": "19.2.0"
+  },
+  "devDependencies": {
+    "vite": "8.3.2"
+  }
+}

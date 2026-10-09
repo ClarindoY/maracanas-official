@@ -1,0 +1,16 @@
+import {DatabaseSync} from 'node:sqlite';
+import {mkdirSync} from 'node:fs';
+import {dirname,resolve} from 'node:path';
+import {randomBytes,createHash,scrypt,timingSafeEqual} from 'node:crypto';
+import {promisify} from 'node:util';
+const derive=promisify(scrypt);
+export const permissions=['Buscar editais','Analisar editais','Registrar decisões','Montar propostas','Acessar documentos','Administrar equipe'];
+export const token=()=>randomBytes(32).toString('hex');
+const digest=v=>createHash('sha256').update(v).digest('hex');
+export async function hashPassword(p){if(typeof p!=='string'||p.length<12||p.length>256)throw new Error('Senha deve ter entre 12 e 256 caracteres.');const salt=randomBytes(16).toString('hex');return salt+':'+(await derive(p,salt,64,{N:32768,r:8,p:1,maxmem:64*1024*1024})).toString('hex');}
+export async function verifyPassword(p,h){if(typeof p!=='string'||p.length>256)return false;const [salt,key]=h.split(':');const actual=await derive(p,salt,64,{N:32768,r:8,p:1,maxmem:64*1024*1024});return timingSafeEqual(actual,Buffer.from(key,'hex'));}
+export function openAuth(path=process.env.ER_AUTH_DB||resolve('data/auth.sqlite')){
+ mkdirSync(dirname(path),{recursive:true});const db=new DatabaseSync(path);db.exec(`PRAGMA foreign_keys=ON; CREATE TABLE IF NOT EXISTS users(id TEXT PRIMARY KEY,name TEXT NOT NULL,login TEXT UNIQUE NOT NULL,email TEXT UNIQUE NOT NULL,password TEXT NOT NULL,admin INTEGER NOT NULL DEFAULT 0,active INTEGER NOT NULL DEFAULT 1,permissions TEXT NOT NULL); CREATE TABLE IF NOT EXISTS sessions(hash TEXT PRIMARY KEY,user_id TEXT NOT NULL REFERENCES users(id),csrf TEXT NOT NULL,expires INTEGER NOT NULL); CREATE TABLE IF NOT EXISTS attempts(key TEXT PRIMARY KEY,count INTEGER NOT NULL,until INTEGER NOT NULL); CREATE TABLE IF NOT EXISTS audit(id INTEGER PRIMARY KEY,time TEXT NOT NULL,actor TEXT NOT NULL,action TEXT NOT NULL);`);
+ const pub=u=>u?{id:u.id,nome:u.name,login:u.login,email:u.email,admin:!!u.admin,ativo:!!u.active,permissoes:JSON.parse(u.permissions)}:null;
+ return {db,pub,audit(actor,action){db.prepare('INSERT INTO audit(time,actor,action) VALUES(?,?,?)').run(new Date().toISOString(),actor,action);},users(){return db.prepare('SELECT * FROM users ORDER BY name').all().map(pub);},blocked(key){const x=db.prepare('SELECT * FROM attempts WHERE key=?').get(key);return x && x.until>Date.now()&&x.count>=8;},fail(key){const x=db.prepare('SELECT * FROM attempts WHERE key=?').get(key);const count=x&&x.until>Date.now()?x.count+1:1;db.prepare('INSERT OR REPLACE INTO attempts VALUES(?,?,?)').run(key,count,x&&x.until>Date.now()?x.until:Date.now()+15*60000);},clear(key){db.prepare('DELETE FROM attempts WHERE key=?').run(key);},session(raw){if(!raw)return null;const s=db.prepare('SELECT s.*,u.* FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.hash=? AND s.expires>? AND u.active=1').get(digest(raw),Date.now());return s?{user:pub(s),csrf:s.csrf}:null;},createSession(id,remember){const raw=token(),csrf=token();db.prepare('DELETE FROM sessions WHERE expires<=?').run(Date.now());db.prepare('INSERT INTO sessions VALUES(?,?,?,?)').run(digest(raw),id,csrf,Date.now()+(remember?7*86400000:8*3600000));return {raw,csrf};},logout(raw){if(raw)db.prepare('DELETE FROM sessions WHERE hash=?').run(digest(raw));}};
+}

@@ -1,0 +1,62 @@
+MARACANÃS V20 - SERVIDOR COMPARTILHADO
+
+ESTA ATUALIZAÇÃO EXIGE O PROJETO COMPLETO. Não substitua somente App.jsx.
+Extraia o ZIP e envie o CONTEÚDO de Central_V20_Render à mesma raiz do projeto no GitHub, substituindo os arquivos. Não envie node_modules, dist, data, bancos de dados, .env ou chaves.
+
+ANTES DO DEPLOY NO SERVIÇO EXISTENTE:
+1. Altere Instance Type para Starter ou superior. Revise os valores na conta.
+2. Adicione um disco persistente em /var/data. O Blueprint incluído usa 1 GB.
+3. Environment:
+NODE_VERSION = 22.16.0
+NODE_ENV = production
+DEMO_MODE = false
+ER_AUTH_DB = /var/data/auth.sqlite
+BACKUP_ENABLED = true
+MAX_DOCUMENT_BYTES = 67108864
+AI_MONTHLY_LIMIT = 100
+OPENAI_MODEL = gpt-4o-mini
+4. Remova DEMO_LOGIN e DEMO_PASSWORD. Não há senha padrão nesta versão.
+5. Para análise de PDFs: adicione OPENAI_API_KEY no painel Environment. A API tem cobrança própria. Nunca coloque a chave no GitHub ou no App.jsx. Sem chave, site e uploads funcionam, mas o resumo apresenta aviso de configuração.
+6. Build: npm ci --include=dev && npm run build
+Start: npm start
+Health Check Path: /api/health
+Root Directory: onde está package.json.
+7. Faça deploy após atualizar todos os arquivos. Render injeta RENDER_EXTERNAL_URL. Para domínio próprio, adicione APP_ORIGIN com a origem HTTPS.
+8. Após o serviço iniciar, abra Shell do serviço e execute: npm run criar-admin
+Preencha nome, login, e-mail e senha de no mínimo 12 caracteres. Não compartilhe a senha no chat. Esse comando usa ER_AUTH_DB e cria a conta no disco persistente. Contas do modo gratuito não são migradas automaticamente.
+9. Faça login, crie funcionários em Administração e atribua permissões. Usuários novos começam sem permissões. Alterar permissões encerra sessões do funcionário; ele deve entrar novamente.
+
+NOVO FLUXO
+Importar edital > título e origem informados pela equipe > criar ficha > enviar edital e anexos em PDF > selecionar até 4 documentos > gerar resumo.
+Cada PDF: até 20 MB / 150 páginas. Conjunto: até 240 mil caracteres de texto extraído. PDF escaneado, criptografado ou com páginas ilegíveis precisa de tratamento/OCR externo nesta versão. Não há resumo parcial silencioso.
+A IA recebe texto dos documentos selecionados. Uso da função envia esse conteúdo à OpenAI. store:false é enviado; isso não é promessa de retenção zero da plataforma.
+Cada seção só permanece quando possui trecho localizado no texto e página corretos. Números apresentados precisam estar presentes nos trechos citados. Isso reduz respostas sem suporte, mas NÃO garante a interpretação da IA. Resumo é proposta para revisão, separado dos campos manuais. Nenhum campo operacional é preenchido automaticamente pelo resumo. Datas inválidas não são corrigidas por suposição.
+Campos manuais são opcionais: ausência permanece em branco. Cada salvamento guarda autor, antes e depois.
+Colaboradores podem editar a mesma ficha. Revisões concorrentes recebem erro 409, pedindo recarregar a ficha; não há sobrescrita automática. Atualizar acervo e Recarregar ficha trazem trabalho de outros colaboradores. Não é sincronização em tempo real.
+A ficha mostra criador e horário de inclusão no servidor. Consultar a ficha registra abertura, mas não muda o criador. Uma oportunidade encontrada já existente mantém o criador original.
+Não há migração automática do IndexedDB da V18: os dados antigos continuam no navegador. Importe PDFs importantes novamente. Não limpar o armazenamento antigo antes de conferir a migração manual.
+Propostas: seleção de documentos por licitação é compartilhada; não envia nada aos portais. Envio oficial e assinatura continuam externos.
+
+AUDITORIA
+Aba Auditoria da administradora: login, logout, buscas PNCP/fontes, criação e abertura de fichas, alterações com antes/depois, responsáveis, colaboradores, documentos anexados/baixados, comentários, análise IA e permissões.
+É auditoria de ações do sistema, não vigilância de outras abas ou prova de horas trabalhadas. Não captura senhas. Sem rota para editar/excluir o histórico; administrador com acesso ao banco/infraestrutura ainda pode modificá-lo. Não é trilha criptográfica inviolável.
+
+BACKUP
+Na inicialização e checagem a cada hora, gera uma cópia por dia UTC, se ainda não existir uma concluída. Inclui banco (contas, licitações, comentários, auditoria) e documentos. Retém as 10 cópias concluídas mais recentes; elimina antigas somente após finalizar nova cópia. Diretório /var/data/backups. Dados e cópias ficam NO MESMO DISCO: não protege contra perda do próprio disco/conta. Cópia externa e tela de restauração não estão implementadas.
+Com disco de 1 GB, o limite de PDFs foi definido em 64 MiB para reservar espaço para as 10 cópias. Aumentar documentos exige dimensionar disco para dados + até 10 backups + banco. Não aumentar MAX_DOCUMENT_BYTES sem revisar espaço.
+Restaurar (operador técnico): parar serviço, copiar auth.sqlite e documents de uma cópia concluída ao diretório /var/data preservando os dados atuais em outra cópia; reiniciar e validar. Não sobrescrever banco com servidor ativo.
+
+LIMITES E PENDÊNCIAS
+PNCP + cinco fontes complementares preservadas. O próximo deploy registra causa de falha de rede do PNCP e prefere IPv4; NÃO foi validado acesso a partir da sua instância Render. Conectores complementares continuam parciais.
+Filtros desta entrega: UF, fonte, modalidade e etapa, sobre o acervo salvo. Busca remota PNCP continua palavra-chave + propostas abertas. Equivalência com todos os filtros PNCP ainda pendente.
+Lista carrega no máximo 2.000 licitações por serviço.
+Recuperação por e-mail, suporte compartilhado, OCR automático, agente conversacional e emissão/envio final de propostas não estão implementados.
+IA tem limite mensal de 100 análises iniciadas (inclusive falhas após o início). É limite de quantidade, não de reais. Controle de cobrança adicional deve ser configurado na conta da API.
+Validação local: build e testes; leitura dos dois PDFs Sebrae validada sem consumo da API. Uma análise REAL depende da sua chave e deve ser conferida antes de uso operacional.
+
+V20 — RESUMO EM OITO BLOCOS
+Todos os subcampos solicitados aparecem explicitamente. Só PDFs selecionados são analisados; anexos não selecionados e atualizações do portal não são consultados. A equipe deve conferir completude do conjunto. Situação atual, fornecedores e disponibilidade dependem de confirmação externa.
+A análise utiliza até sete chamadas de IA (os blocos com dados extraíveis), transmitindo o conjunto selecionado em cada chamada; o custo será maior que na V19. O limite mensal conta análises iniciadas, não chamadas individuais. Pode demorar vários minutos; evite sair da ficha durante o processamento. Falha em qualquer bloco preserva o resumo anterior sem salvar resultado parcial.
+Custos e margens não são inventados: a equipe informa quantidade, preço, custo unitário, tributos e indiretos por item. O desconto simulado incide apenas nas linhas marcadas disputáveis. Resultado = receita - custo - tributos; ponto de equilíbrio = custo / (1 - alíquota), por linha. Esse modelo não cobre regimes tributários complexos ou despesas omitidas. Simulação de desconto é temporária; as premissas são salvas.
+Pendências têm responsável, data e status. Parecer é revisado pela equipe: recomendação positiva exige quatro viabilidades confirmadas, justificativa e pendências concluídas. Não certifica habilitação ou exequibilidade e não altera a decisão automaticamente. Referências literais são verificadas, mas não garantem interpretação correta; confira o original. Sem chave API não há análise real.
+Dados e complementos V19 são preservados no mesmo banco; gere novamente o resumo para o formato V20. Não mude a localização do banco para atualizar.
